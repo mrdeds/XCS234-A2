@@ -59,6 +59,54 @@ class NatureQN(Linear):
         img_height, img_width, n_channels = state_shape
         num_actions = self.env.action_space.n
         ### START CODE HERE ###
+        in_channels = n_channels * self.config["hyper_params"]["state_history"]
+        device = getattr(self, "device", torch.device("cpu"))
+
+        features = nn.Sequential(
+            nn.Conv2d(in_channels, 32, kernel_size=8, stride=4, padding=2),  # pad only here
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),                      # no padding
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),                      # no padding
+            nn.ReLU(inplace=True),
+            nn.Flatten()
+        )
+        with torch.no_grad():
+            dummy = torch.zeros(1, in_channels, img_height, img_width, device=device)
+            flat_dim = features.to(device)(dummy).shape[1]
+
+        head = nn.Sequential(
+            nn.Linear(flat_dim, 512),
+            nn.ReLU(inplace=True),
+            nn.Linear(512, num_actions)
+        )
+        self.q_network = nn.Sequential(
+            *list(features.children()),
+            *list(head.children())
+            ).to(device)
+
+        # fresh init (same architecture) for target net
+        features_t = nn.Sequential(
+            nn.Conv2d(in_channels, 32, kernel_size=8, stride=4, padding=2),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU(inplace=True),
+            nn.Flatten()
+        )
+        with torch.no_grad():
+            flat_dim_t = features_t.to(device)(dummy).shape[1]
+        head_t = nn.Sequential(
+            nn.Linear(flat_dim_t, 512),
+            nn.ReLU(inplace=True),
+            nn.Linear(512, num_actions)
+        )
+        self.target_network = nn.Sequential(
+            *list(features_t.children()),
+            *list(head_t.children())
+            ).to(device)
+
         ### END CODE HERE ###
 
     ############################################################
@@ -89,6 +137,14 @@ class NatureQN(Linear):
         out = None
 
         ### START CODE HERE ###
+        # Permute state to match Conv2d input shape (batch_size, channels, height, width)
+        state = state.permute(0, 3, 1, 2)
+        if network == "q_network":
+            out = self.q_network(state)
+        elif network == "target_network":
+            out = self.target_network(state)
+        else:
+            raise ValueError("Network must be either 'q_network' or 'target_network'")
         ### END CODE HERE ###
 
         return out

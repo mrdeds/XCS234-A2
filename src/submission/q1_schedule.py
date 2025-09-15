@@ -53,6 +53,11 @@ class LinearSchedule(object):
                 self.epsilon value, which is self.eps_end.
         """
         ### START CODE HERE ###
+        if self.nsteps > 0:
+            frac = min(1.0, float(t) / float(self.nsteps))
+        else:
+            frac = 1.0
+        self.epsilon = self.eps_begin + frac * (self.eps_end - self.eps_begin)
         ### END CODE HERE ###
 
 
@@ -91,6 +96,11 @@ class LinearExploration(LinearSchedule):
                 env.action_space.sample() to generate a random action
         """
         ### START CODE HERE ###
+        # ε-greedy using NumPy RNG (the tests seed np.random)
+        if np.random.rand() < self.epsilon:
+            return int(np.random.randint(self.env.action_space.n))
+        else:
+            return int(best_action)
         ### END CODE HERE ###
 
 
